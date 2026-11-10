@@ -21,6 +21,12 @@ def main(argv: list[str] | None = None) -> None:
     imp.add_argument("--dir", default=str(config.ROOT / "data" / "raw" / "transfermarkt"),
                      help="where the CSV files are (downloaded there if missing)")
     imp.add_argument("--no-download", action="store_true")
+    imp.add_argument("--live-cache", default=str(config.ROOT / "data" / "raw" / "tm-api"),
+                     help="responses from fetch-tm-live; used when the directory exists")
+    live = sub.add_parser("fetch-tm-live", help="fetch contracts, injuries and Ekstraklasa stats from Transfermarkt's API (cached, resumable)")
+    live.add_argument("--dir", default=str(config.ROOT / "data" / "raw" / "transfermarkt"))
+    live.add_argument("--cache", default=str(config.ROOT / "data" / "raw" / "tm-api"))
+    live.add_argument("--concurrency", type=int, default=3)
     sub.add_parser("all", help="seed + train + value")
     sub.add_parser("bootstrap", help="run `all` only if the database has no trained model yet (used by Docker)")
     report = sub.add_parser("report", help="print the evaluation report of a model version")
@@ -55,10 +61,17 @@ def main(argv: list[str] | None = None) -> None:
         src = Path(args.dir)
         if not args.no_download:
             tm.download(src)
-        tables = tm.load(src)
+        live_cache = Path(args.live_cache)
+        tables = tm.load(src, live_cache if live_cache.exists() else None)
         db.create_schema(engine, drop=True)
         db.write_tables(engine, tables)
         print("imported transfermarkt-datasets: " + ", ".join(f"{k}={len(v)}" for k, v in tables.items()))
+    if args.cmd == "fetch-tm-live":
+        from pathlib import Path
+
+        from .importers import tm_live
+
+        print(tm_live.fetch(Path(args.dir), Path(args.cache), concurrency=args.concurrency))
     if args.cmd in ("train", "all"):
         from .pipeline import train as run_train
 

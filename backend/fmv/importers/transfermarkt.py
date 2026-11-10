@@ -98,8 +98,12 @@ def classify_transfers(t: pd.DataFrame) -> pd.DataFrame:
     return t
 
 
-def load(src: Path) -> dict[str, pd.DataFrame]:
-    """Build the source tables of our schema from the downloaded files."""
+def load(src: Path, live_cache: Path | None = None) -> dict[str, pd.DataFrame]:
+    """Build the source tables of our schema from the downloaded files.
+
+    With ``live_cache`` (responses fetched by ``tm_live.fetch``) the dump is enriched with
+    point-in-time contracts, injury history and Ekstraklasa league statistics.
+    """
     comps = _read(src, "competitions")
     clubs_raw = _read(src, "clubs")
     games = _read(src, "games", parse_dates=["date"],
@@ -147,6 +151,8 @@ def load(src: Path) -> dict[str, pd.DataFrame]:
     stats["team_minutes"] = (stats["games"].fillna(0) * 90).astype(int)
     stats["team_points_per_game"] = stats["ppg"].round(3)
     stats = stats.rename(columns={"season": "season_id"})
+    if live_cache is not None:
+        stats = pd.concat([stats, _ekstraklasa_stats(live_cache, team, years, club_ids, stats)], ignore_index=True)
     for col in ["xg", "xa", "shots", "key_passes", "progressive_passes", "tackles", "interceptions", "aerials_won", "saves"]:
         stats[col] = np.nan  # not published by this source
     stats = stats.drop(columns=["first", "games", "ppg"])
@@ -192,7 +198,42 @@ def load(src: Path) -> dict[str, pd.DataFrame]:
                                "date": val["date"].dt.normalize(), "value_eur": val["market_value_in_eur"].astype(float),
                                "source": "transfermarkt"})
 
-    empty_contracts = pd.DataFrame(columns=["id", "player_id", "club_id", "start_date", "end_date", "source"])
-    empty_injuries = pd.DataFrame(columns=["id", "player_id", "start_date", "end_date", "days_missed", "type"])
+    contracts = pd.DataFrame(columns=["player_id", "club_id", "start_date", "end_date", "source"])
+    injuries = pd.DataFrame(columns=["player_id", "start_date", "end_date", "days_missed", "type"])
+    if live_cache is not None:
+        from . import tm_live
+
+        # today's contract is visible from the last yearly snapshot on (used for current valuations only)
+        visible = pd.Timestamp(data_end.year, 6, 14) if data_end.month >= 7 else pd.Timestamp(data_end.year - 1, 6, 14)
+        contracts = pd.concat([tm_live.contracts(live_cache), tm_live.current_contracts(live_cache, players, visible)])
+        contracts = contracts[contracts["player_id"].isin(keep) & contracts["club_id"].isin(club_ids)]
+        injuries = tm_live.injuries(live_cache)
+        injuries = injuries[injuries["player_id"].isin(keep) & (injuries["start_date"] <= data_end)]
+    contracts = contracts.reset_index(drop=True)
+    contracts.insert(0, "id", np.arange(1, len(contracts) + 1))
+    injuries = injuries.reset_index(drop=True)
+    injuries.insert(0, "id", np.arange(1, len(injuries) + 1))
     return {"leagues": leagues, "clubs": clubs, "seasons": seasons, "players": players, "player_statistics": stats,
-            "transfers": transfers, "contracts": empty_contracts, "injuries": empty_injuries, "market_valuations": valuations}
+            "transfers": transfers, "contracts": contracts, "injuries": injuries, "market_valuations": valuations}
+
+
+def _ekstraklasa_stats(live_cache: Path, team: pd.DataFrame, years: list[int], club_ids: set,
+                       existing: pd.DataFrame) -> pd.DataFrame:
+    """Ekstraklasa league statistics from the live API (the dump has no Ekstraklasa appearances).
+
+    Team context (games played, points per game) comes from the dump's match results where they
+    exist (recent seasons only); otherwise team minutes are unknown (0) and points per game missing.
+    """
+    from . import tm_live
+
+    s = tm_live.league_stats(live_cache, "PL1")
+    s = s[s["season"].isin(years) & s["club_id"].isin(club_ids) & (s["appearances"] > 0)]
+    s = s.groupby(["player_id", "season", "club_id"], as_index=False).sum()
+    s["league_id"] = LEAGUES["PL1"][0]
+    taken = existing.groupby(["player_id", "season_id"]).size().rename("n").reset_index()
+    s = s.merge(taken.rename(columns={"season_id": "season"}), on=["player_id", "season"], how="left")
+    s["stint"] = s.groupby(["player_id", "season"]).cumcount() + 1 + s["n"].fillna(0).astype(int)
+    s = s.merge(team, on=["club_id", "season"], how="left")
+    s["team_minutes"] = (s["games"].fillna(0) * 90).astype(int)
+    s["team_points_per_game"] = s["ppg"].round(3)
+    return s.drop(columns=["n", "games", "ppg"]).rename(columns={"season": "season_id"})

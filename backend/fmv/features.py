@@ -257,10 +257,14 @@ def build_player_features(data: Data, snaps: pd.DataFrame, adj: LeagueAdjuster) 
         ["club_id", "as_of", "club_ppg_last", "seller_income_3y"]], on=["club_id", "as_of"], how="left")
 
     # ---- contract ----------------------------------------------------------------
-    con = data.contracts[["player_id", "start_date", "end_date"]].rename(columns={"player_id": "_p"})
+    con = data.contracts[["player_id", "club_id", "start_date", "end_date"]].rename(columns={"player_id": "_p", "club_id": "_cclub"})
     s = _asof(s, con, "as_of", "start_date", "player_id", "_p")
     s["contract_months"] = ((s["end_date"] - s["as_of"]).dt.days / 30.44).clip(lower=0)
-    s = s.drop(columns=["start_date", "end_date"])
+    # the latest known contract only counts if it is with the player's club at as_of and has not ended:
+    # otherwise (moved on, loaned out, contract history not covered) the length is unknown
+    unknown = (s["_cclub"].astype(float) != s["club_id"].astype(float)) | (s["end_date"] < s["as_of"])
+    s.loc[unknown, "contract_months"] = np.nan
+    s = s.drop(columns=["start_date", "end_date", "_cclub"])
 
     # ---- injuries ----------------------------------------------------------------
     inj = s[["sid", "player_id", "as_of"]].merge(data.injuries[["player_id", "start_date", "end_date"]], on="player_id")
