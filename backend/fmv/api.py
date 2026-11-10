@@ -102,6 +102,7 @@ def summary(state: State = Depends(get_state)) -> dict:
     with state.engine.connect() as conn:
         count = lambda table: conn.execute(select(func.count()).select_from(table)).scalar()  # noqa: E731
         sources = [r[0] for r in conn.execute(select(db.Transfer.source).distinct())]
+        conn_contracts = conn.execute(select(func.count()).select_from(db.Contract.__table__)).scalar()
         out = {
             "players": count(P), "clubs": count(C), "leagues": count(L), "transfers": count(db.Transfer.__table__),
             "valued_players": conn.execute(select(func.count()).select_from(MP).where(_latest(state))).scalar(),
@@ -110,6 +111,8 @@ def summary(state: State = Depends(get_state)) -> dict:
     out.update({
         "as_of": str(state.as_of), "model_version": state.version["name"],
         "synthetic_data": all(s.startswith("synthetic") for s in sources),
+        "data_sources": sorted(sources),
+        "has_contracts": bool(conn_contracts),
         "test_metrics": {"market_value": m["market_value"]["overall"], "transfer_value": m["transfer_value"]["overall"],
                          "reference_valuation": m["baselines"]["reference_valuation"], "split": m["split"]},
     })

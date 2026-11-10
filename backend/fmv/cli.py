@@ -17,6 +17,10 @@ def main(argv: list[str] | None = None) -> None:
     train.add_argument("--name")
     value = sub.add_parser("value", help="value all players with a model version (latest by default)")
     value.add_argument("--version")
+    imp = sub.add_parser("import-tm", help="(re)create the schema and load the open transfermarkt-datasets collection")
+    imp.add_argument("--dir", default=str(config.ROOT / "data" / "raw" / "transfermarkt"),
+                     help="where the CSV files are (downloaded there if missing)")
+    imp.add_argument("--no-download", action="store_true")
     sub.add_parser("all", help="seed + train + value")
     sub.add_parser("bootstrap", help="run `all` only if the database has no trained model yet (used by Docker)")
     report = sub.add_parser("report", help="print the evaluation report of a model version")
@@ -43,6 +47,18 @@ def main(argv: list[str] | None = None) -> None:
         db.write_tables(engine, world.tables)
         print(f"seeded synthetic data into {config.DATABASE_URL.split('@')[-1]}: "
               + ", ".join(f"{k}={len(v)}" for k, v in world.tables.items()))
+    if args.cmd == "import-tm":
+        from pathlib import Path
+
+        from .importers import transfermarkt as tm
+
+        src = Path(args.dir)
+        if not args.no_download:
+            tm.download(src)
+        tables = tm.load(src)
+        db.create_schema(engine, drop=True)
+        db.write_tables(engine, tables)
+        print("imported transfermarkt-datasets: " + ", ".join(f"{k}={len(v)}" for k, v in tables.items()))
     if args.cmd in ("train", "all"):
         from .pipeline import train as run_train
 

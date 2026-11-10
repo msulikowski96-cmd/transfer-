@@ -31,8 +31,9 @@ _WEIGHTS = {
     "FWD": {"xg90": 0.6, "goals90": 0.4, "xa90": 0.5, "assists90": 0.2, "shots90": 0.03, "key_passes90": 0.05},
     "MID": {"xg90": 0.4, "goals90": 0.3, "xa90": 0.5, "assists90": 0.2, "key_passes90": 0.06,
             "progressive_passes90": 0.02, "def_actions90": 0.03},
-    "DEF": {"def_actions90": 0.05, "aerials_won90": 0.04, "progressive_passes90": 0.015, "xg90": 0.3, "xa90": 0.4},
-    "GK": {"save_pct": 3.0, "clean_sheet_rate": 0.3},
+    "DEF": {"def_actions90": 0.05, "aerials_won90": 0.04, "progressive_passes90": 0.015, "xg90": 0.3, "xa90": 0.4,
+            "goals90": 0.3, "assists90": 0.3, "clean_sheet_rate": 0.3, "conceded90": -0.2},
+    "GK": {"save_pct": 3.0, "clean_sheet_rate": 0.3, "conceded90": -0.2},
 }
 COUNT_COLS = ["goals", "assists", "xg", "xa", "shots", "key_passes", "progressive_passes",
               "tackles", "interceptions", "aerials_won", "saves", "goals_conceded", "clean_sheets"]
@@ -48,16 +49,25 @@ def add_rates(df: pd.DataFrame) -> pd.DataFrame:
     faced = out["saves"] + out["goals_conceded"]
     out["save_pct"] = (out["saves"] / faced.where(faced > 0)).astype(float)
     out["clean_sheet_rate"] = out["clean_sheets"] / m90
+    out["conceded90"] = out["goals_conceded"] / m90
     return out
 
 
 def raw_index(df: pd.DataFrame) -> pd.Series:
-    """Un-standardised performance index; needs rate columns and ``position_group``."""
+    """Un-standardised performance index; needs rate columns and ``position_group``.
+
+    Statistics that the data source does not publish for a position group (all
+    values missing, e.g. xG in a source without event data) are left out, so the
+    same code works for rich and for basic data.
+    """
     idx = pd.Series(np.nan, index=df.index, dtype=float)
     for group, weights in _WEIGHTS.items():
         mask = df["position_group"] == group
-        if mask.any():
-            idx[mask] = sum(w * df.loc[mask, col].astype(float) for col, w in weights.items())
+        if not mask.any():
+            continue
+        usable = {c: w for c, w in weights.items() if df.loc[mask, c].notna().any()}
+        if usable:
+            idx[mask] = sum(w * df.loc[mask, c].astype(float) for c, w in usable.items())
     return idx
 
 

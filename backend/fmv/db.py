@@ -54,12 +54,15 @@ class Player(Base):
     nationality: Mapped[str] = mapped_column(String(60))
     position: Mapped[str] = mapped_column(String(4))  # GK CB FB DM CM AM W ST
     position_group: Mapped[str] = mapped_column(String(4))  # GK DEF MID FWD
-    foot: Mapped[str] = mapped_column(String(6))
-    height_cm: Mapped[int] = mapped_column(Integer)
+    foot: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    height_cm: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class PlayerStatistic(Base):
-    """One row per player / season / club stint (a winter transfer gives two)."""
+    """One row per player / season / club stint (a winter transfer gives two).
+
+    Event statistics (xG, tackles, ...) are NULL when the source does not publish them.
+    """
 
     __tablename__ = "player_statistics"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -72,17 +75,17 @@ class PlayerStatistic(Base):
     minutes: Mapped[int] = mapped_column(Integer)
     goals: Mapped[int] = mapped_column(Integer)
     assists: Mapped[int] = mapped_column(Integer)
-    xg: Mapped[float] = mapped_column(Float)
-    xa: Mapped[float] = mapped_column(Float)
-    shots: Mapped[int] = mapped_column(Integer)
-    key_passes: Mapped[int] = mapped_column(Integer)
-    progressive_passes: Mapped[int] = mapped_column(Integer)
-    tackles: Mapped[int] = mapped_column(Integer)
-    interceptions: Mapped[int] = mapped_column(Integer)
-    aerials_won: Mapped[int] = mapped_column(Integer)
-    saves: Mapped[int] = mapped_column(Integer)
-    goals_conceded: Mapped[int] = mapped_column(Integer)
-    clean_sheets: Mapped[int] = mapped_column(Integer)
+    xg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    xa: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shots: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    key_passes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    progressive_passes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tackles: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    interceptions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    aerials_won: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    saves: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    goals_conceded: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    clean_sheets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     team_minutes: Mapped[int] = mapped_column(Integer)  # minutes the team played in the stint
     team_points_per_game: Mapped[float] = mapped_column(Float)
 

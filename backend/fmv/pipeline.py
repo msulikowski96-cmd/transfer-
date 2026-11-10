@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import pickle
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from .league_adjustment import LeagueAdjuster
 from .metrics import breakdown, regression_metrics
 
 
-WARMUP_YEARS = 3
+WARMUP_YEARS = int(os.environ.get("FMV_WARMUP_YEARS", "3"))
 
 
 class Valuer:
@@ -62,7 +63,9 @@ def deal_frame(data: Data, adj: LeagueAdjuster) -> pd.DataFrame:
         "club_id": t["from_club_id"].to_numpy(), "buyer_club_id": t["to_club_id"].to_numpy(),
         "fee_eur": t["fee_eur"].to_numpy(),
     })
-    return add_deal_features(data, build_player_features(data, snaps, adj), adj)
+    deals = add_deal_features(data, build_player_features(data, snaps, adj), adj)
+    # only sellers from leagues we have player statistics for (others have no evidence to value)
+    return deals[deals["league_id"].isin(data.stats["league_id"].unique())].reset_index(drop=True)
 
 
 def snapshot_dates(data: Data) -> list[pd.Timestamp]:
@@ -264,6 +267,8 @@ def transfer_scenarios(data: Data, valuer: Valuer, feats: pd.DataFrame) -> pd.Da
     fees = data.fee_transfers()
     fees = fees[(fees["date"] < as_of) & (fees["date"] >= as_of - pd.Timedelta(days=1095))]
     typical = np.log(fees.groupby("to_club_id")["fee_eur"].median().reindex(clubs)).to_numpy()
+    # only clubs that actually bought someone recently can be a "typical buyer"
+    clubs, typical = clubs[~np.isnan(typical)], typical[~np.isnan(typical)]
     mats = {k: np.empty((len(feats), len(clubs))) for k in ("transfer_value_eur", "transfer_value_low_eur", "transfer_value_high_eur")}
     for j, club in enumerate(clubs):
         p = valuer.transfer(add_deal_features(data, feats.assign(buyer_club_id=club), valuer.adj))

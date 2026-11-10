@@ -44,7 +44,7 @@ export type Metrics = { n: number; mae_eur: number; rmse_eur: number; wape: numb
                         bias_log?: number; interval_coverage?: number; interval_rel_width?: number };
 export type Summary = {
   players: number; clubs: number; leagues: number; transfers: number; valued_players: number; as_of: string;
-  model_version: string; synthetic_data: boolean;
+  model_version: string; synthetic_data: boolean; data_sources: string[]; has_contracts: boolean;
   test_metrics: { market_value: Metrics; transfer_value: Metrics; reference_valuation: Metrics;
                   split: Record<string, string | number> };
 };

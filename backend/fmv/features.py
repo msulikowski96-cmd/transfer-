@@ -106,6 +106,9 @@ def _asof(left: pd.DataFrame, right: pd.DataFrame, left_on: str, right_on: str, 
     left["_order"] = np.arange(len(left))
     left[left_on] = left[left_on].astype("datetime64[ns]")
     right = right.assign(**{right_on: right[right_on].astype("datetime64[ns]")})
+    if left[by_left].dtype != right[by_right].dtype:  # e.g. int ids vs ids with missing values
+        left[by_left] = left[by_left].astype("float64")
+        right = right.assign(**{by_right: right[by_right].astype("float64")})
     merged = pd.merge_asof(
         left.sort_values(left_on), right.sort_values(right_on),
         left_on=left_on, right_on=right_on, left_by=by_left, right_by=by_right, allow_exact_matches=False,
@@ -330,6 +333,7 @@ def add_deal_features(data: Data, feats: pd.DataFrame, adj: LeagueAdjuster) -> p
 
 def data_quality(feats: pd.DataFrame) -> pd.Series:
     """0..1 score: how much of the evidence the valuation relies on is actually there."""
+    has_contracts = feats["contract_months"].notna().any()
     parts = [
         (feats["l1_minutes"] >= 900) * 0.35 + ((feats["l1_minutes"] >= 300) & (feats["l1_minutes"] < 900)) * 0.15,
         (feats["l2_minutes"] >= 900) * 0.20,
@@ -337,4 +341,7 @@ def data_quality(feats: pd.DataFrame) -> pd.Series:
         (feats["career_minutes"] >= 3000) * 0.15,
         feats["club_ppg_last"].notna() * 0.10,
     ]
-    return sum(parts).astype(float).round(2)
+    score = sum(parts).astype(float)
+    if not has_contracts:  # the source has no contract data at all: do not penalise every player for it
+        score = score / 0.8
+    return score.clip(0, 1).round(2)

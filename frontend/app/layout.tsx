@@ -27,6 +27,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Dane syntetyczne: zawodnicy, kluby i kwoty są fikcyjne. Wersja deweloperska do czasu podłączenia licencjonowanych źródeł.
           </div>
         )}
+        {summary && !summary.synthetic_data && summary.data_sources.includes("transfermarkt-datasets") && (
+          <div className="banner">
+            Dane: otwarty zbiór transfermarkt-datasets (do lipca 2026), wyłącznie do celów badawczych. Źródło nie zawiera xG,
+            kontraktów ani kontuzji; Ekstraklasa nie ma statystyk zawodników.
+          </div>
+        )}
         {!summary && <div className="banner">Brak połączenia z API wycen albo brak wytrenowanego modelu.</div>}
         <main className="wrap">{children}</main>
       </body>

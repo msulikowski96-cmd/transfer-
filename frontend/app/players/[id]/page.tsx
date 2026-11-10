@@ -48,7 +48,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <div className="value" style={{ fontSize: 20 }}>
             <span className={`tag ${p.uncertainty}`} style={{ fontSize: 14 }}>niepewność {UNCERTAINTY[p.uncertainty]}</span>
           </div>
-          <div className="note">jakość danych {num(p.data_quality * 100, 0)}% · wycena referencyjna {eur(p.reference_value_eur)}</div></div>
+          <div className="note">względem innych wycen (tercyle szerokości przedziału) · jakość danych {num(p.data_quality * 100, 0)}% · wycena referencyjna {eur(p.reference_value_eur)}</div></div>
       </section>
 
       <section className="grid g2">
@@ -77,7 +77,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       <section className="card">
         <h2>Symulator transferu</h2>
-        <p className="sub" style={{ marginTop: -6 }}>Ile zapłaciłby konkretny klub w konkretnym oknie, przy zadanej długości kontraktu.</p>
+        <p className="sub" style={{ marginTop: -6 }}>Ile zapłaciłby konkretny klub w konkretnym oknie{d.profile.contract_months !== null ? ", przy zadanej długości kontraktu" : ""}.</p>
         <Simulator playerId={p.id} clubs={clubs} contractMonths={d.profile.contract_months} />
       </section>
 

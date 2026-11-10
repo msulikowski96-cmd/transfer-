@@ -45,8 +45,10 @@ export function Simulator({ playerId, clubs, contractMonths }: { playerId: numbe
         <select value={win} onChange={(e) => setWin(e.target.value)} aria-label="Okno transferowe">
           <option value="summer">Okno letnie</option><option value="winter">Okno zimowe</option>
         </select>
-        <input type="number" min={0} max={84} value={contract} onChange={(e) => setContract(e.target.value)}
-               placeholder="Kontrakt (mies.)" aria-label="Pozostały kontrakt w miesiącach" style={{ width: 150 }} />
+        {contractMonths !== null && (
+          <input type="number" min={0} max={84} value={contract} onChange={(e) => setContract(e.target.value)}
+                 placeholder="Kontrakt (mies.)" aria-label="Pozostały kontrakt w miesiącach" style={{ width: 150 }} />
+        )}
         <button type="submit" disabled={busy || !buyer}>{busy ? "Liczę…" : "Symuluj"}</button>
       </form>
       {error && <p className="error">{error}</p>}

@@ -10,11 +10,13 @@ Niezależny system wyceny piłkarzy na europejskim rynku transferowym. Dla każd
 Modele uczą się na **rzeczywistych kwotach transferów**. Wyceny publikowane przez portale są wyłącznie
 punktem odniesienia: nie są ani etykietą, ani cechą modelu.
 
-> **Stan danych.** Repozytorium nie zawiera jeszcze danych z licencjonowanych źródeł (Sportmonks,
-> StatsBomb, football-data.org, Transfermarkt). Do rozwoju i testów służy **generator danych syntetycznych**
-> (`backend/fmv/synthetic.py`): zawodnicy, kluby i kwoty są fikcyjne, a nazwy lig oznaczają tylko docelowy
-> zakres pierwszej wersji. Podane niżej metryki pokazują, że metoda odzyskuje znany sygnał. **Nie mówią nic
-> o dokładności na prawdziwym rynku** – tę trzeba zmierzyć po podłączeniu danych.
+> **Stan danych.** Są dwa źródła:
+> 1. **Prawdziwe dane**: importer otwartego zbioru [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets)
+>    (`fmv import-tm`), dane do lipca 2026. Zbiór ma licencję CC0, ale treść pochodzi z Transfermarkt, więc
+>    traktujemy go jako dane badawcze, nie licencjonowane źródło dla produktu komercyjnego.
+> 2. **Dane syntetyczne** (`fmv seed`): fikcyjny świat do testów i rozwoju bez dostępu do sieci.
+>
+> Docelowe źródło komercyjne (np. Sportmonks) wymaga osobnego importera i licencji.
 
 ## Szybki start
 
@@ -29,7 +31,13 @@ Lokalnie, bez Dockera (SQLite):
 ```bash
 cd backend
 python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
-python -m fmv.cli all            # seed (dane syntetyczne) + train + value
+
+# prawdziwe dane (pobiera ok. 70 MB, import ok. 1 min, trening i wyceny ok. 2 min)
+python -m fmv.cli import-tm
+FMV_TRAIN_END=2022-06-20 FMV_VAL_END=2023-06-20 python -m fmv.cli train
+python -m fmv.cli value
+# albo: dane syntetyczne
+python -m fmv.cli all            # seed + train + value
 uvicorn fmv.api:app --port 8000
 pytest                           # testy
 
@@ -39,13 +47,15 @@ npm install && npm run dev       # http://localhost:3000 (FMV_API_URL domyślnie
 
 | Komenda | Działanie |
 | --- | --- |
+| `fmv import-tm` | tworzy schemat i ładuje otwarty zbiór transfermarkt-datasets (kasuje poprzednie dane) |
 | `fmv seed` | tworzy schemat i ładuje dane syntetyczne (kasuje poprzednie) |
 | `fmv train` | trenuje wszystkie silniki, zapisuje nową wersję modelu i raport jakości |
 | `fmv value` | wycenia wszystkich zawodników (historia roczna + pełna wycena bieżąca) |
 | `fmv report` | wypisuje raport jakości wybranej wersji |
 
 Konfiguracja przez zmienne środowiskowe: `FMV_DATABASE_URL`, `FMV_ARTIFACTS_DIR`, `FMV_TRAIN_END`,
-`FMV_VAL_END`, `FMV_MODEL_VERSION`, `FMV_API_URL` (frontend).
+`FMV_VAL_END`, `FMV_WARMUP_YEARS`, `FMV_MODEL_VERSION`, `FMV_API_URL` (frontend).
+Docker przy pierwszym starcie ładuje dane syntetyczne; prawdziwe dane ładuje się komendą `import-tm` w kontenerze `api`.
 
 ## Architektura
 
@@ -96,7 +106,37 @@ frontend/                  Next.js: dashboard, profil, symulator, porównywarka,
 | walidacja | do 2022-06-20 | early stopping, wagi ensemble, kalibracja przedziałów |
 | test | później | pomiar jakości; modele nie widziały tych transferów |
 
-## Jakość (dane syntetyczne, 1603 transfery testowe)
+## Jakość na prawdziwych danych (transfermarkt-datasets)
+
+Trening na transferach do 06.2022, walidacja do 06.2023, test na 2110 transferach z 07.2023–07.2026,
+których model nie widział. Etykieta: stała kwota transferu definitywnego, sprzedający z jednej z 7 lig ze statystykami.
+
+| | MAE | WAPE | Median APE | Pokrycie przedziału 80% |
+| --- | --- | --- | --- | --- |
+| Transfer Value | €4,64 mln | 43,8% | 45,0% | 82,3% |
+| Market Value | €5,21 mln | 49,2% | 51,2% | 85,3% |
+| wycena Transfermarkt sprzed transferu | – | 34,3% | 38,9% | – |
+| mediana dla pozycji | – | 83,3% | 79,1% | – |
+
+**Wniosek: na tych danych model jest wyraźnie gorszy od wycen Transfermarkt.** Brakuje mu informacji,
+które Transfermarkt ma (długość kontraktu, kontuzje, xG, wiedza skautów), a wyceny Transfermarkt bywają
+aktualizowane tuż przed transferem, gdy kwota jest już znana z mediów. Najgorzej wypadają kwoty poniżej
+€1 mln (mediana błędu powyżej 100%); dla kwot powyżej €5 mln mediana błędu to około 38–39%.
+
+Inne obserwacje:
+- Wyuczona trudność lig jest sensowna: Premier League > La Liga ≈ Bundesliga ≈ Serie A > Ligue 1 > Eredivisie ≈ Liga Portugal.
+- Ranking aktualnych wycen zgadza się z Transfermarkt w dużej mierze (korelacja rang 0,88, mediana stosunku 0,95).
+- Przedziały 80% są skalibrowane, ale bardzo szerokie (mediana: górna granica 12× dolna).
+- Prognoza zmiany wartości jest tylko trochę lepsza od założenia „bez zmian” (błąd log 0,47 wobec 0,52
+  dla 12 mies.) i systematycznie obniża zawodników z czołówki.
+- Wyraźne błędy u zawodników bez historii płatnych transferów (np. przejście za darmo).
+
+Ograniczenia źródła: brak xG i statystyk defensywnych, brak historii kontraktów (pole kontraktu jest
+pomijane, bo jego użycie wstecz byłoby przeciekiem z przyszłości), brak kontuzji, a **Ekstraklasa nie ma
+statystyk zawodników**, więc polscy zawodnicy nie są wyceniani. Wypożyczenia są rozpoznawane heurystycznie
+(powrót do tego samego klubu w ciągu 400 dni).
+
+## Jakość na danych syntetycznych (1603 transfery testowe)
 
 | | MAE | WAPE | Median APE | Pokrycie przedziału 80% |
 | --- | --- | --- | --- | --- |
@@ -134,8 +174,8 @@ jakość danych, niepewność), `player_comparisons`. Definicje: `backend/fmv/db
 
 ## Czego jeszcze nie ma
 
-- **Prawdziwych danych.** Trzeba napisać importery do tabel źródłowych oraz dopasowanie tych samych
-  zawodników między źródłami, a przed użyciem komercyjnym sprawdzić licencje.
+- **Licencjonowanego źródła danych** z xG, kontraktami i Ekstraklasą (np. Sportmonks) oraz dopasowania
+  tych samych zawodników między źródłami.
 - **LSTM, MLflow, Redis, Celery, Evidently, wyjaśnień pisanych przez LLM** – świadomie odłożone do czasu,
   aż będzie na czym je zmierzyć. Wersje modeli i ich metryki są na razie w tabeli `model_versions`.
 - **Automatycznych aktualizacji** (etap 6): `fmv train` i `fmv value` uruchamia się ręcznie lub z crona.
