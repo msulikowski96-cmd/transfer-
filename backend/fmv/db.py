@@ -87,7 +87,7 @@ class PlayerStatistic(Base):
     goals_conceded: Mapped[int | None] = mapped_column(Integer, nullable=True)
     clean_sheets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     team_minutes: Mapped[int] = mapped_column(Integer)  # minutes the team played in the stint
-    team_points_per_game: Mapped[float] = mapped_column(Float)
+    team_points_per_game: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class Transfer(Base):
