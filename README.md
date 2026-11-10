@@ -71,6 +71,7 @@ dane (PostgreSQL, 12 tabel)
   └─ pipeline.py           trening, ewaluacja, wyceny wsadowe, wyjaśnienia (Model E), podobni zawodnicy
   └─ api.py                FastAPI
 frontend/                  Next.js: dashboard, profil, symulator, porównywarka, jakość modelu
+teabe78th/                 Expo (iOS/Android/web): rynek, wyszukiwarka, profil z symulatorem, jakość modelu
 ```
 
 ### Jak powstaje wycena
