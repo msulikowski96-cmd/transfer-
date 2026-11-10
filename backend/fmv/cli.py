@@ -1,0 +1,58 @@
+"""Command line entry point: ``python -m fmv.cli <command>``."""
+from __future__ import annotations
+
+import argparse
+import json
+
+from . import config, db
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="fmv", description="Football Market Value AI")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    seed = sub.add_parser("seed", help="(re)create the schema and load SYNTHETIC development data")
+    seed.add_argument("--players", type=int, default=6000)
+    seed.add_argument("--seed", type=int, default=7)
+    train = sub.add_parser("train", help="train all engines and store a new model version")
+    train.add_argument("--name")
+    value = sub.add_parser("value", help="value all players with a model version (latest by default)")
+    value.add_argument("--version")
+    sub.add_parser("all", help="seed + train + value")
+    report = sub.add_parser("report", help="print the evaluation report of a model version")
+    report.add_argument("--version")
+    args = parser.parse_args(argv)
+
+    engine = db.get_engine()
+    if args.cmd in ("seed", "all"):
+        from .synthetic import generate
+
+        world = generate(seed=getattr(args, "seed", 7), n_players=getattr(args, "players", 6000))
+        db.create_schema(engine, drop=True)
+        db.write_tables(engine, world.tables)
+        print(f"seeded synthetic data into {config.DATABASE_URL.split('@')[-1]}: "
+              + ", ".join(f"{k}={len(v)}" for k, v in world.tables.items()))
+    if args.cmd in ("train", "all"):
+        from .pipeline import train as run_train
+
+        result = run_train(engine, name=getattr(args, "name", None))
+        r = result["report"]
+        print(f"trained {result['name']}: test n={r['split']['n_test']}")
+        for key in ("market_value", "transfer_value"):
+            o = r[key]["overall"]
+            print(f"  {key:15s} MAE €{o['mae_eur'] / 1e6:.2f}M  WAPE {o['wape']:.1%}  MdAPE {o['median_ape']:.1%}  "
+                  f"coverage {o['interval_coverage']:.1%}")
+        for key, o in r["baselines"].items():
+            print(f"  baseline {key}: WAPE {o['wape']:.1%}  MdAPE {o['median_ape']:.1%} (n={o['n']})")
+    if args.cmd in ("value", "all"):
+        from .pipeline import value_all
+
+        print("valued:", value_all(engine, getattr(args, "version", None)))
+    if args.cmd == "report":
+        from .pipeline import load_models
+
+        row, _ = load_models(engine, args.version)
+        print(json.dumps(row["metrics"], indent=2))
+
+
+if __name__ == "__main__":
+    main()
