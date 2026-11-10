@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: fmv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fmv}
+      POSTGRES_DB: fmv
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fmv"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    environment:
+      FMV_DATABASE_URL: postgresql+psycopg://fmv:${POSTGRES_PASSWORD:-fmv}@db:5432/fmv
+    volumes:
+      - artifacts:/artifacts
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      retries: 60
+      start_period: 120s
+
+  web:
+    build: ./frontend
+    environment:
+      FMV_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  artifacts:

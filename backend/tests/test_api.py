@@ -60,7 +60,8 @@ def test_simulator(client):
 
 def test_rankings_and_compare(client):
     rows = client.get("/rankings/undervalued", params={"limit": 10}).json()
-    assert rows and all(r["value_ratio"] > 1 and r["reference_value_eur"] < r["market_value_low_eur"] for r in rows)
+    assert rows and all(r["value_ratio"] > 1 and r["reference_value_eur"] < r["market_value_low_eur"]
+                        and r["uncertainty"] != "high" for r in rows)
     ids = ",".join(str(r["id"]) for r in rows[:2])
     assert len(client.get("/compare", params={"ids": ids}).json()) == 2
     assert client.get("/compare", params={"ids": "1"}).status_code == 422

@@ -18,11 +18,23 @@ def main(argv: list[str] | None = None) -> None:
     value = sub.add_parser("value", help="value all players with a model version (latest by default)")
     value.add_argument("--version")
     sub.add_parser("all", help="seed + train + value")
+    sub.add_parser("bootstrap", help="run `all` only if the database has no trained model yet (used by Docker)")
     report = sub.add_parser("report", help="print the evaluation report of a model version")
     report.add_argument("--version")
     args = parser.parse_args(argv)
 
     engine = db.get_engine()
+    if args.cmd == "bootstrap":
+        from sqlalchemy import func, inspect, select
+
+        has_model = inspect(engine).has_table("model_predictions")
+        if has_model:
+            with engine.connect() as conn:
+                has_model = bool(conn.execute(select(func.count()).select_from(db.ModelPrediction)).scalar())
+        if has_model:
+            print("model and valuations already present - nothing to do")
+            return
+        args.cmd = "all"
     if args.cmd in ("seed", "all"):
         from .synthetic import generate
 

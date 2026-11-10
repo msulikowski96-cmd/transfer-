@@ -224,7 +224,7 @@ def explain(mv: MarketValueEngine, feats: pd.DataFrame) -> list[list[dict]]:
 
 
 def _eur(v: float) -> str:
-    return f"€{v / 1e6:.1f} mln" if v >= 1e6 else f"€{v / 1e3:.0f} tys."
+    return (f"€{v / 1e6:.1f} mln" if v >= 1e6 else f"€{v / 1e3:.0f} tys.").replace(".", ",", 1 if v >= 1e6 else 0)
 
 
 def summary_text(row: pd.Series, factors: list[dict]) -> str:

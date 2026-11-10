@@ -1,0 +1,59 @@
+:root {
+  --bg: #0b1016; --panel: #131a23; --panel-2: #1a2330; --line: #263242;
+  --text: #e8edf3; --muted: #93a1b3; --accent: #3ddc97; --accent-2: #5aa9ff;
+  --pos: #3ddc97; --neg: #ff6b6b; --warn: #f5b942;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--accent); }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 0 0 12px; letter-spacing: .02em; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 48px; }
+header.top { border-bottom: 1px solid var(--line); background: #0d131b; }
+header.top .wrap { display: flex; align-items: center; gap: 20px; padding: 12px 16px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 17px; }
+.brand span { color: var(--accent); }
+nav { display: flex; gap: 16px; color: var(--muted); flex-wrap: wrap; }
+.banner { background: #3a2f10; color: #f8dc93; border-bottom: 1px solid #5a4a1c; font-size: 13px; padding: 7px 16px; text-align: center; }
+.sub { color: var(--muted); font-size: 13px; }
+.grid { display: grid; gap: 14px; }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 860px) { .g4, .g3 { grid-template-columns: repeat(2, 1fr); } .g2 { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .g4, .g3 { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.kpi .value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .value.accent { color: var(--accent); }
+.kpi .note { color: var(--muted); font-size: 12px; }
+section { margin-top: 22px; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+td.r, th.r { text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
+.tag.low { color: var(--pos); border-color: #1f5d45; }
+.tag.medium { color: var(--warn); border-color: #6b5320; }
+.tag.high { color: var(--neg); border-color: #6b2c2c; }
+.pos { color: var(--pos); } .neg { color: var(--neg); } .muted { color: var(--muted); }
+form.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+input, select, button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; min-width: 0; }
+input[type=search], input[type=text] { flex: 1 1 220px; }
+button { background: var(--accent); color: #06231a; border-color: var(--accent); font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .6; cursor: default; }
+.factor { display: grid; grid-template-columns: minmax(120px, 1.3fr) 2fr 56px; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
+.bar { position: relative; height: 10px; background: var(--panel-2); border-radius: 5px; }
+.bar i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.bar::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--line); }
+.summary { color: #cfd8e3; }
+.pager { display: flex; gap: 12px; align-items: center; margin-top: 12px; color: var(--muted); }
+.error { color: var(--neg); }
+svg text { fill: var(--muted); font-size: 11px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; }

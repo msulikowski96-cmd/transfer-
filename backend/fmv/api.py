@@ -156,13 +156,13 @@ def undervalued(league_id: int | None = None, position_group: str | None = None,
                 state: State = Depends(get_state)) -> list[dict]:
     """Players whose model Market Value is furthest above the external reference valuation.
 
-    Only confident valuations are ranked: enough data and the reference value
-    below the lower end of the model's 80% interval.
+    Only confident valuations are ranked: enough data, uncertainty not "high" and
+    the reference value below the lower end of the model's 80% interval.
     """
     ratio = (MP.c.market_value_eur / MP.c.reference_value_eur).label("value_ratio")
     query = _filters(_listing(state).add_columns(ratio), league_id, position_group).where(
         MP.c.reference_value_eur > 0, MP.c.market_value_eur >= min_value_eur, MP.c.data_quality >= min_data_quality,
-        MP.c.reference_value_eur < MP.c.market_value_low_eur)
+        MP.c.reference_value_eur < MP.c.market_value_low_eur, MP.c.uncertainty != "high")
     rows = _age(state.rows(query.order_by(ratio.desc()).limit(limit * 4 if max_age else limit)), state.as_of)
     if max_age:
         rows = [r for r in rows if r["age"] <= max_age]
