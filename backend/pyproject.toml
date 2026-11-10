@@ -1,0 +1,34 @@
+[project]
+name = "fmv"
+version = "0.1.0"
+description = "Football Market Value AI - valuation engine"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "scipy>=1.11",
+  "scikit-learn>=1.4",
+  "catboost>=1.2",
+  "xgboost>=2.0",
+  "lightgbm>=4.7",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.1",
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+fmv = "fmv.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["fmv*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
