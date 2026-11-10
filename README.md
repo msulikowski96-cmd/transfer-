@@ -35,7 +35,7 @@ python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 # prawdziwe dane (pobiera ok. 70 MB, import ok. 1 min, trening i wyceny ok. 2 min)
 python -m fmv.cli import-tm
 # opcjonalnie (ok. 45 min): kontrakty, kontuzje i Ekstraklasa z API Transfermarktu, potem ponowny import
-python -m fmv.cli fetch-tm-live
+pip install -e ".[live]" && python -m fmv.cli fetch-tm-live
 python -m fmv.cli import-tm --no-download
 FMV_TRAIN_END=2022-06-20 FMV_VAL_END=2023-06-20 python -m fmv.cli train
 python -m fmv.cli value
