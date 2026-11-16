@@ -34,6 +34,9 @@ python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 
 # prawdziwe dane (pobiera ok. 70 MB, import ok. 1 min, trening i wyceny ok. 2 min)
 python -m fmv.cli import-tm
+# opcjonalnie (ok. 45 min): kontrakty, kontuzje i Ekstraklasa z API Transfermarktu, potem ponowny import
+pip install -e ".[live]" && python -m fmv.cli fetch-tm-live
+python -m fmv.cli import-tm --no-download
 FMV_TRAIN_END=2022-06-20 FMV_VAL_END=2023-06-20 python -m fmv.cli train
 python -m fmv.cli value
 # albo: dane syntetyczne
@@ -47,7 +50,8 @@ npm install && npm run dev       # http://localhost:3000 (FMV_API_URL domyślnie
 
 | Komenda | Działanie |
 | --- | --- |
-| `fmv import-tm` | tworzy schemat i ładuje otwarty zbiór transfermarkt-datasets (kasuje poprzednie dane) |
+| `fmv import-tm` | tworzy schemat i ładuje otwarty zbiór transfermarkt-datasets (kasuje poprzednie dane); używa danych z `fetch-tm-live`, jeśli są |
+| `fmv fetch-tm-live` | pobiera z API Transfermarktu kontrakty, kontuzje i statystyki Ekstraklasy do pamięci podręcznej (można przerwać i wznowić) |
 | `fmv seed` | tworzy schemat i ładuje dane syntetyczne (kasuje poprzednie) |
 | `fmv train` | trenuje wszystkie silniki, zapisuje nową wersję modelu i raport jakości |
 | `fmv value` | wycenia wszystkich zawodników (historia roczna + pełna wycena bieżąca) |
@@ -107,35 +111,47 @@ teabe78th/                 Expo (iOS/Android/web): rynek, wyszukiwarka, profil z
 | walidacja | do 2022-06-20 | early stopping, wagi ensemble, kalibracja przedziałów |
 | test | później | pomiar jakości; modele nie widziały tych transferów |
 
-## Jakość na prawdziwych danych (transfermarkt-datasets)
+## Jakość na prawdziwych danych (transfermarkt-datasets + API Transfermarktu)
 
-Trening na transferach do 06.2022, walidacja do 06.2023, test na 2110 transferach z 07.2023–07.2026,
-których model nie widział. Etykieta: stała kwota transferu definitywnego, sprzedający z jednej z 7 lig ze statystykami.
+Dane: otwarty zbiór transfermarkt-datasets (`fmv import-tm`) uzupełniony przez `fmv fetch-tm-live`
+(biblioteka [transfermarkt-api](https://github.com/felipeall/transfermarkt-api)) o:
+- kontrakt ze sprzedającym w dniu każdego transferu,
+- historię kontuzji,
+- statystyki Ekstraklasy.
+
+Trening na transferach do 06.2022, walidacja do 06.2023, test na 2212 transferach z 07.2023–07.2026,
+których model nie widział. Etykieta: stała kwota transferu definitywnego, sprzedający z jednej z 8 lig.
 
 | | MAE | WAPE | Median APE | Pokrycie przedziału 80% |
 | --- | --- | --- | --- | --- |
-| Transfer Value | €4,64 mln | 43,8% | 45,0% | 82,3% |
-| Market Value | €5,21 mln | 49,2% | 51,2% | 85,3% |
-| wycena Transfermarkt sprzed transferu | – | 34,3% | 38,9% | – |
-| mediana dla pozycji | – | 83,3% | 79,1% | – |
+| Transfer Value | €4,34 mln | 42,7% | 43,7% | 81,8% |
+| Market Value | €4,83 mln | 47,5% | 49,3% | 81,8% |
+| wycena Transfermarkt sprzed transferu | – | 34,5% | 40,0% | – |
+| mediana dla pozycji | – | 84,4% | 80,2% | – |
 
-**Wniosek: na tych danych model jest wyraźnie gorszy od wycen Transfermarkt.** Brakuje mu informacji,
-które Transfermarkt ma (długość kontraktu, kontuzje, xG, wiedza skautów), a wyceny Transfermarkt bywają
-aktualizowane tuż przed transferem, gdy kwota jest już znana z mediów. Najgorzej wypadają kwoty poniżej
-€1 mln (mediana błędu powyżej 100%); dla kwot powyżej €5 mln mediana błędu to około 38–39%.
+Bez danych z API (sam zbiór, 7 lig, 2110 transferów) Transfer Value miał medianę błędu 45,0%,
+a Market Value 51,2%. Najważniejszą cechą modelu jest teraz długość kontraktu. Najwięcej zyskały
+Bundesliga i Eredivisie oraz transfery powyżej €20 mln (mediana błędu z 38% do 33%).
+
+**Wniosek: model nadal jest gorszy od wycen Transfermarkt**, choć różnica się zmniejszyła. Wyceny
+Transfermarkt bywają aktualizowane tuż przed transferem, gdy kwota jest już znana z mediów, a modelowi
+wciąż brakuje xG i wiedzy skautów. Najgorzej wypadają kwoty poniżej €1 mln (mediana błędu powyżej 100%).
 
 Inne obserwacje:
 - Wyuczona trudność lig jest sensowna: Premier League > La Liga ≈ Bundesliga ≈ Serie A > Ligue 1 > Eredivisie ≈ Liga Portugal.
-- Ranking aktualnych wycen zgadza się z Transfermarkt w dużej mierze (korelacja rang 0,88, mediana stosunku 0,95).
-- Przedziały 80% są skalibrowane, ale bardzo szerokie (mediana: górna granica 12× dolna).
-- Prognoza zmiany wartości jest tylko trochę lepsza od założenia „bez zmian” (błąd log 0,47 wobec 0,52
-  dla 12 mies.) i systematycznie obniża zawodników z czołówki.
-- Wyraźne błędy u zawodników bez historii płatnych transferów (np. przejście za darmo).
+- Ranking aktualnych wycen zgadza się z Transfermarkt w dużej mierze (korelacja rang 0,88, mediana stosunku 1,04).
+- Ekstraklasa jest wyceniana, ale z dużym błędem (mediana 54% na 92 transferach testowych).
+- Przedziały 80% są skalibrowane, ale bardzo szerokie.
+- Prognoza zmiany wartości jest tylko trochę lepsza od założenia „bez zmian” (błąd log 0,48 wobec 0,52 dla 12 mies.).
+- Starsi zawodnicy, zwłaszcza bramkarze po 35. roku życia, są wyraźnie przeszacowani.
 
-Ograniczenia źródła: brak xG i statystyk defensywnych, brak historii kontraktów (pole kontraktu jest
-pomijane, bo jego użycie wstecz byłoby przeciekiem z przyszłości), brak kontuzji, a **Ekstraklasa nie ma
-statystyk zawodników**, więc polscy zawodnicy nie są wyceniani. Wypożyczenia są rozpoznawane heurystycznie
-(powrót do tego samego klubu w ciągu 400 dni).
+Ograniczenia: brak xG i statystyk defensywnych. Kontrakt jest znany tylko w dniu transferu i dziś
+(przedłużenia między transferami nie są widoczne). Dla starszych sezonów Ekstraklasy brakuje wyników
+meczów, więc nie ma kontekstu drużyny. Wypożyczenia są rozpoznawane heurystycznie (powrót do tego samego
+klubu w ciągu 400 dni).
+
+**Kwestia prawna:** oba źródła to dane Transfermarktu. `fetch-tm-live` pobiera je z ich wewnętrznego API,
+co regulamin Transfermarktu wyklucza. Tylko do prywatnych badań, nie do produktu komercyjnego.
 
 ## Jakość na danych syntetycznych (1603 transfery testowe)
 

@@ -29,8 +29,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         {summary && !summary.synthetic_data && summary.data_sources.includes("transfermarkt-datasets") && (
           <div className="banner">
-            Dane: otwarty zbiór transfermarkt-datasets (do lipca 2026), wyłącznie do celów badawczych. Źródło nie zawiera xG,
-            kontraktów ani kontuzji; Ekstraklasa nie ma statystyk zawodników.
+            {summary.has_contracts
+              ? "Dane: transfermarkt-datasets uzupełnione o kontrakty, kontuzje i Ekstraklasę z API Transfermarktu; wyłącznie do celów badawczych. Brak xG."
+              : "Dane: otwarty zbiór transfermarkt-datasets (do lipca 2026), wyłącznie do celów badawczych. Źródło nie zawiera xG, kontraktów ani kontuzji; Ekstraklasa nie ma statystyk zawodników."}
           </div>
         )}
         {!summary && <div className="banner">Brak połączenia z API wycen albo brak wytrenowanego modelu.</div>}
